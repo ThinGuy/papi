@@ -1,4 +1,4 @@
-### **Ubuntu Package and Project Inforamtion (PAPI)**
+### **Ubuntu Package and Project Information (PAPI)**
 ---
 
 ### **Project Overview**
