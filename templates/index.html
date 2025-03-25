@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ubuntu Repository Size Estimator</title>
+    <style>
+        body { font-family: 'Ubuntu', Arial, sans-serif; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        select, button, input { padding: 8px; }
+        button { cursor: pointer; background-color: #0066cc; color: white; border: none; padding: 10px 15px; }
+        .checkbox-group { display: flex; flex-wrap: wrap; }
+        .checkbox-item { margin-right: 15px; margin-bottom: 5px; }
+        #results { margin-top: 30px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        table, th, td { border: 1px solid #ddd; }
+        th, td { padding: 10px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        #summary { margin-top: 20px; padding: 15px; background-color: #f8f8f8; border-left: 4px solid #0066cc; }
+        .error { color: #c7162b; margin-top: 10px; }
+        #loading { text-align: center; padding: 20px; }
+        .token-input { width: 100%; max-width: 500px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Ubuntu Repository Size Estimator</h1>
+        
+        <div id="form">
+            <div class="form-group">
+                <label for="repo-type">Repository Type:</label>
+                <select id="repo-type">
+                    <option value="archive">archive.ubuntu.com</option>
+                    <option value="ports">ports.ubuntu.com</option>
+                    <option value="esm">esm.ubuntu.com</option>
+                    <option value="cloud">ubuntu-cloud.archive.canonical.com</option>
+                    <option value="custom">Custom Repository URL</option>
+                </select>
+            </div>
+            
+            <div class="form-group" id="custom-url-group" style="display:none;">
+                <label for="custom-url">Custom Repository URL:</label>
+                <input type="text" id="custom-url" placeholder="https://my-repo.example.com/ubuntu" style="width: 100%; max-width: 500px;">
+            </div>
+            
+            <div class="form-group" id="entitlement-group" style="display:none;">
+                <label for="entitlement">Entitlement:</label>
+                <select id="entitlement">
+                    <option value="infra">infra</option>
+                    <option value="apps">apps</option>
+                    <option value="fips">fips</option>
+                    <option value="fips-updates">fips-updates</option>
+                    <option value="fips-preview">fips-preview</option>
+                    <option value="cis">cis</option>
+                    <option value="usg">usg</option>
+                    <option value="ros">ros</option>
+                    <option value="ros-updates">ros-updates</option>
+                    <option value="realtime">realtime</option>
+                    <option value="cc">cc</option>
+                    <option value="infra-legacy">infra-legacy</option>
+                </select>
+            </div>
+            
+            <div class="form-group" id="token-group" style="display:none;">
+                <label for="ubuntu-pro-token">Ubuntu Pro Token (for ESM repositories):</label>
+                <input type="text" id="ubuntu-pro-token" class="token-input" placeholder="Your Ubuntu Pro token">
+                <p><small>Note: Your token is only used for size estimation and is not stored.</small></p>
+            </div>
+            
+            <div class="form-group">
+                <label for="release">Release:</label>
+                <select id="release">
+                    <option value="noble">Noble (24.04)</option>
+                    <option value="jammy" selected>Jammy (22.04)</option>
+                    <option value="focal">Focal (20.04)</option>
+                    <option value="bionic">Bionic (18.04)</option>
+                    <option value="xenial">Xenial (16.04)</option>
+                    <option value="trusty">Trusty (14.04)</option>
+                    <option value="precise">Precise (12.04)</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Pockets:</label>
+                <div class="checkbox-group" id="pockets">
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="pocket-release" value="release" checked>
+                        <label for="pocket-release">release</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="pocket-updates" value="updates" checked>
+                        <label for="pocket-updates">updates</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="pocket-security" value="security" checked>
+                        <label for="pocket-security">security</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="pocket-backports" value="backports">
+                        <label for="pocket-backports">backports</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="pocket-proposed" value="proposed">
+                        <label for="pocket-proposed">proposed</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Components:</label>
+                <div class="checkbox-group" id="components">
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="component-main" value="main" checked>
+                        <label for="component-main">main</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="component-restricted" value="restricted">
+                        <label for="component-restricted">restricted</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="component-universe" value="universe">
+                        <label for="component-universe">universe</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="component-multiverse" value="multiverse">
+                        <label for="component-multiverse">multiverse</label>
+                    </div>
+                    <div class="checkbox-item" id="component-partner-item" style="display:none;">
+                        <input type="checkbox" id="component-partner" value="partner">
+                        <label for="component-partner">partner</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Architectures:</label>
+                <div class="checkbox-group" id="architectures">
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="arch-amd64" value="binary-amd64" checked>
+                        <label for="arch-amd64">amd64</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="arch-arm64" value="binary-arm64">
+                        <label for="arch-arm64">arm64</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="arch-i386" value="binary-i386">
+                        <label for="arch-i386">i386</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="arch-ppc64el" value="binary-ppc64el">
+                        <label for="arch-ppc64el">ppc64el</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="arch-s390x" value="binary-s390x">
+                        <label for="arch-s390x">s390x</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="arch-source" value="source">
+                        <label for="arch-source">source</label>
+                    </div>
+                </div>
+            </div>
+            
+            <button id="calculate">Calculate Size</button>
+        </div>
+        
+        <div id="results" style="display:none;">
+            <h2>Repository Size Estimate</h2>
+            
+            <div id="configuration-summary"></div>
+            
+            <div id="loading">Calculating repository sizes... <br><br>This may take a moment.</div>
+            
+            <div id="error-message" class="error" style="display:none;"></div>
+            
+            <table id="results-table" style="display:none;">
+                <thead>
+                    <tr>
+                        <th>Repository</th>
+                        <th>Package Count</th>
+                        <th>Size</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody id="results-body">
+                </tbody>
+            </table>
+            
+            <div id="summary" style="display:none;">
+                <h3>Summary</h3>
+                <p><strong>Total Packages:</strong> <span id="total-packages">0</span></p>
+                <p><strong>Total Size:</strong> <span id="total-size">0 B</span></p>
+                <p><strong>Estimated Disk Space Required:</strong> <span id="estimated-space">0 B</span></p>
+            </div>
+            
+            <div style="margin-top: 20px;">
+                <button id="new-calculation">New Calculation</button>
+                <button id="download-report" style="margin-left: 10px;">Download Report</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Show/hide fields based on repository type
+            document.getElementById('repo-type').addEventListener('change', function() {
+                const repoType = this.value;
+                const entitlementGroup = document.getElementById('entitlement-group');
+                const tokenGroup = document.getElementById('token-group');
+                const customUrlGroup = document.getElementById('custom-url-group');
+                const componentPartnerItem = document.getElementById('component-partner-item');
+                
+                // Reset display
+                entitlementGroup.style.display = 'none';
+                tokenGroup.style.display = 'none';
+                customUrlGroup.style.display = 'none';
+                componentPartnerItem.style.display = 'none';
+                
+                // Show relevant fields
+                if (repoType === 'esm') {
+                    entitlementGroup.style.display = 'block';
+                    tokenGroup.style.display = 'block';
+                } else if (repoType === 'custom') {
+                    customUrlGroup.style.display = 'block';
+                } else if (repoType === 'archive' && document.getElementById('release').value === 'partner') {
+                    componentPartnerItem.style.display = 'inline-block';
+                }
+                
+                // Adjust component options based on repo type
+                const componentMain = document.getElementById('component-main');
+                const componentOthers = [
+                    document.getElementById('component-restricted'),
+                    document.getElementById('component-universe'),
+                    document.getElementById('component-multiverse')
+                ];
+                
+                if (repoType === 'esm') {
+                    componentMain.checked = true;
+                    componentOthers.forEach(comp => {
+                        comp.checked = false;
+                        comp.disabled = true;
+                    });
+                } else {
+                    componentOthers.forEach(comp => {
+                        comp.disabled = false;
+                    });
+                }
+            });
+            
+            // Calculate button click handler
+            document.getElementById('calculate').addEventListener('click', async function() {
+                // Validate selections
+                const repoType = document.getElementById('repo-type').value;
+                
+                if (repoType === 'custom' && !document.getElementById('custom-url').value.trim()) {
+                    alert('Please enter a custom repository URL');
+                    return;
+                }
+                
+                const components = Array.from(document.querySelectorAll('#components input:checked'));
+                if (components.length === 0) {
+                    alert('Please select at least one component');
+                    return;
+                }
+                
+                const architectures = Array.from(document.querySelectorAll('#architectures input:checked'));
+                if (architectures.length === 0) {
+                    alert('Please select at least one architecture');
+                    return;
+                }
+                
+                const pockets = Array.from(document.querySelectorAll('#pockets input:checked'));
+                if (pockets.length === 0) {
+                    alert('Please select at least one pocket');
+                    return;
+                }
+                
+                if (repoType === 'esm' && !document.getElementById('ubuntu-pro-token').value.trim()) {
+                    alert('Please enter your Ubuntu Pro token for ESM repositories');
+                    return;
+                }
+                
+                // Show loading state
+                document.getElementById('form').style.display = 'none';
+                document.getElementById('results').style.display = 'block';
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('results-table').style.display = 'none';
+                document.getElementById('summary').style.display = 'none';
+                document.getElementById('error-message').style.display = 'none';
+                
+                // Gather form data
+                const entitlement = document.getElementById('entitlement').value;
+                const release = document.getElementById('release').value;
+                const token = document.getElementById('ubuntu-pro-token').value;
+                const customUrl = document.getElementById('custom-url').value;
+                
+                const pocketValues = pockets.map(cb => cb.value);
+                const componentValues = components.map(cb => cb.value);
+                const architectureValues = architectures.map(cb => cb.value);
+                
+                // Prepare request data
+                const data = {
+                    repo_type: repoType === 'custom' ? customUrl : repoType,
+                    entitlement: entitlement,
+                    release: release,
+                    pockets: pocketValues,
+                    components: componentValues,
+                    architectures: architectureValues
+                };
+                
+                // Add token for ESM repositories
+                if (repoType === 'esm') {
+                    data.token = token;
+                }
+                
+                // Display configuration summary
+                const configSummary = document.getElementById('configuration-summary');
+                configSummary.innerHTML = `<p><strong>Configuration:</strong> `;
+                
+                if (repoType === 'esm') {
+                    configSummary.innerHTML += `ESM (${entitlement}) - `;
+                } else if (repoType === 'custom') {
+                    configSummary.innerHTML += `${customUrl} - `;
+                } else {
+                    configSummary.innerHTML += `${repoType} - `;
+                }
+                
+                configSummary.innerHTML += `${release} - `;
+                configSummary.innerHTML += `${pocketValues.join(', ')} - `;
+                configSummary.innerHTML += `${componentValues.join(', ')} - `;
+                configSummary.innerHTML += `${architectureValues.map(a => a.replace('binary-', '')).join(', ')}`;
+                configSummary.innerHTML += `</p>`;
+                
+                try {
+                    // Send API request
+                    const response = await fetch('/api/estimate', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(data)
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`API request failed with status ${response.status}`);
+                    }
+                    
+                    const result = await response.json();
+                    
+                    // Check if we have any results
+                    if (result.results.length === 0) {
+                        document.getElementById('loading').style.display = 'none';
+                        document.getElementById('error-message').textContent = 'No repositories found for the selected combination. Please try different parameters.';
+                        document.getElementById('error-message').style.display = 'block';
+                        return;
+                    }
+                    
+                    // Populate results table
+                    const tableBody = document.getElementById('results-body');
+                    tableBody.innerHTML = '';
+                    
+                    result.results.forEach(item => {
+                        const row = document.createElement('tr');
+                        
+                        // Format repository name
+                        let repoName = '';
+                        if (item.pocket === 'release') {
+                            repoName = `${release} / ${item.component} / ${item.architecture.replace('binary-', '')}`;
+                        } else {
+                            repoName = `${release}-${item.pocket} / ${item.component} / ${item.architecture.replace('binary-', '')}`;
+                        }
+                        
+                        row.innerHTML = `
+                            <td>${repoName}</td>
+                            <td>${item.package_count.toLocaleString()}</td>
+                            <td>${item.size}</td>
+                            <td><small>${item.url}</small></td>
+                        `;
+                        tableBody.appendChild(row);
+                    });
+                    
+                    // Populate summary
+                    document.getElementById('total-packages').textContent = result.summary.total_packages.toLocaleString();
+                    document.getElementById('total-size').textContent = result.summary.total_size;
+                    document.getElementById('estimated-space').textContent = result.summary.estimated_disk_space;
+                    
+                    // Show results
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('results-table').style.display = 'table';
+                    document.getElementById('summary').style.display = 'block';
+                    
+                } catch (error) {
+                    console.error('Error calculating repository size:', error);
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('error-message').textContent = `Error calculating size: ${error.message}. Please try again.`;
+                    document.getElementById('error-message').style.display = 'block';
+                }
+            });
+            
+            // New calculation button
+            document.getElementById('new-calculation').addEventListener('click', function() {
+                document.getElementById('form').style.display = 'block';
+                document.getElementById('results').style.display = 'none';
+            });
+            
+            // Download report button
+            document.getElementById('download-report').addEventListener('click', function() {
+                const configSummary = document.getElementById('configuration-summary').textContent;
+                const totalPackages = document.getElementById('total-packages').textContent;
+                const totalSize = document.getElementById('total-size').textContent;
+                const estimatedSpace = document.getElementById('estimated-space').textContent;
+                
+                let reportContent = "Ubuntu Repository Size Estimate\n\n";
+                reportContent += configSummary + "\n\n";
+                reportContent += "Summary:\n";
+                reportContent += `Total Packages: ${totalPackages}\n`;
+                reportContent += `Total Size: ${totalSize}\n`;
+                reportContent += `Estimated Disk Space Required: ${estimatedSpace}\n\n`;
+                
+                reportContent += "Repository Details:\n";
+                
+                const table = document.getElementById('results-table');
+                const rows = table.querySelectorAll('tbody tr');
+                
+                rows.forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    reportContent += `${cells[0].textContent}: ${cells[1].textContent} packages, ${cells[2].textContent}\n`;
+                    reportContent += `  URL: ${cells[3].textContent}\n`;
+                });
+                
+                reportContent += "\nGenerated by Ubuntu Repository Size Estimator\n";
+                reportContent += `Date: ${new Date().toISOString()}\n`;
+                
+                // Create a download link
+                const blob = new Blob([reportContent], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'repository-size-estimate.txt';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+            
+            // Initialize UI state
+            document.getElementById('repo-type').dispatchEvent(new Event('change'));
+        });
+    </script>
+</body>
+</html>
